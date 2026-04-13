@@ -5,13 +5,9 @@ from typing import List
 
 app = FastAPI(title="Sistema de Gestión de Usuarios y Vehículos (Seguro)")
 
-# --- CONFIGURACIÓN DE SEGURIDAD (OAuth2) ---
-# Esto hace que aparezca el botón "Authorize" con el candado en Swagger
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
-# Función para simular la verificación de un token
 def verificar_acceso(token: str = Depends(oauth2_scheme)):
-    # Para pruebas, el token será "mi-token-secreto"
     if token != "mi-token-secreto":
         raise HTTPException(
             status_code=401, 
@@ -19,13 +15,11 @@ def verificar_acceso(token: str = Depends(oauth2_scheme)):
         )
     return token
 
-# --- MODELOS DE DATOS ---
 class Vehiculo(BaseModel):
     id: int
     marca: str
     modelo: str
 
-# --- BASE DE DATOS SIMULADA ---
 db_permisos = {
     1: "PUNTUACIONES/LEER",
     2: "PUNTUACIONES/CREAR",
@@ -49,8 +43,6 @@ db_vehiculos = [
     {"id": 1, "marca": "Toyota", "modelo": "Hilux"},
     {"id": 2, "marca": "Tesla", "modelo": "Model 3"}
 ]
-
-# --- ENDPOINTS DE USUARIOS ---
 
 @app.get("/usuarios")
 def listar_usuarios():
@@ -79,7 +71,6 @@ def obtener_permisos_usuario(id: int):
             permisos_finales.add(db_permisos[perm_id])
     return sorted(list(permisos_finales))
 
-# --- ENDPOINTS DE ROLES Y PERMISOS ---
 
 @app.get("/roles")
 def listar_roles():
@@ -94,9 +85,6 @@ def obtener_permisos_del_rol(id: int):
 @app.get("/permisos")
 def listar_permisos():
     return db_permisos
-
-# --- CRUD DE VEHICULOS (PROTEGIDOS CON TOKEN) ---
-# He protegido los de escritura (POST, PUT, DELETE) para usar el token de Jairo
 
 @app.get("/vehiculos")
 def listar_vehiculos():
