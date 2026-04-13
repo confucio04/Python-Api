@@ -1,16 +1,31 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
+from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel
+from typing import List
 
-app = FastAPI(title="Sistema de Gestión de Usuarios y Vehículos")
+app = FastAPI(title="Sistema de Gestión de Usuarios y Vehículos (Seguro)")
 
-# --- MODELOS (Pydantic) ---
+# --- CONFIGURACIÓN DE SEGURIDAD (OAuth2) ---
+# Esto hace que aparezca el botón "Authorize" con el candado en Swagger
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+# Función para simular la verificación de un token
+def verificar_acceso(token: str = Depends(oauth2_scheme)):
+    # Para pruebas, el token será "mi-token-secreto"
+    if token != "mi-token-secreto":
+        raise HTTPException(
+            status_code=401, 
+            detail="No autorizado: Token inválido"
+        )
+    return token
+
+# --- MODELOS DE DATOS ---
 class Vehiculo(BaseModel):
     id: int
     marca: str
     modelo: str
 
 # --- BASE DE DATOS SIMULADA ---
-# Estructura de permisos según tu requerimiento
 db_permisos = {
     1: "PUNTUACIONES/LEER",
     2: "PUNTUACIONES/CREAR",
@@ -18,14 +33,12 @@ db_permisos = {
     4: "PUNTUACIONES/ELIMINAR"
 }
 
-# Definición de Roles
 db_roles = {
     1: {"nombre": "Rol_1: Solo lectura", "permisos": [1]},
     2: {"nombre": "Rol_2: Solo escritura", "permisos": [2]},
     3: {"nombre": "Rol_3: Actualizar y eliminar", "permisos": [3, 4]}
 }
 
-# Usuarios con roles asignados
 db_usuarios = {
     1: {"nombre": "Admin", "roles": [1, 2, 3]},
     2: {"nombre": "Editor", "roles": [2, 3]},
@@ -82,7 +95,8 @@ def obtener_permisos_del_rol(id: int):
 def listar_permisos():
     return db_permisos
 
-# --- CRUD DE VEHICULOS ---
+# --- CRUD DE VEHICULOS (PROTEGIDOS CON TOKEN) ---
+# He protegido los de escritura (POST, PUT, DELETE) para usar el token de Jairo
 
 @app.get("/vehiculos")
 def listar_vehiculos():
@@ -96,12 +110,12 @@ def obtener_vehiculo(id: int):
     return vehiculo
 
 @app.post("/vehiculos", status_code=201)
-def crear_vehiculo(vehiculo: Vehiculo):
+def crear_vehiculo(vehiculo: Vehiculo, token: str = Depends(verificar_acceso)):
     db_vehiculos.append(vehiculo.dict())
-    return {"mensaje": "Vehículo registrado con éxito", "data": vehiculo}
+    return {"mensaje": "Vehículo registrado", "usuario_token": token}
 
 @app.put("/vehiculos/{id}")
-def actualizar_vehiculo(id: int, vehiculo_data: Vehiculo):
+def actualizar_vehiculo(id: int, vehiculo_data: Vehiculo, token: str = Depends(verificar_acceso)):
     for index, v in enumerate(db_vehiculos):
         if v["id"] == id:
             db_vehiculos[index] = vehiculo_data.dict()
@@ -109,10 +123,7 @@ def actualizar_vehiculo(id: int, vehiculo_data: Vehiculo):
     raise HTTPException(status_code=404, detail="Vehículo no encontrado")
 
 @app.delete("/vehiculos/{id}")
-def eliminar_vehiculo(id: int):
+def eliminar_vehiculo(id: int, token: str = Depends(verificar_acceso)):
     global db_vehiculos
-    original_size = len(db_vehiculos)
     db_vehiculos = [v for v in db_vehiculos if v["id"] != id]
-    if len(db_vehiculos) == original_size:
-        raise HTTPException(status_code=404, detail="Vehículo no encontrado")
     return {"mensaje": "Vehículo eliminado"}
